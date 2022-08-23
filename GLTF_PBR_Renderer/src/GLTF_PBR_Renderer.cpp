@@ -845,7 +845,9 @@ void GLTF_PBR_Renderer::Begin(IRenderDevice*              pDevice,
             CacheUseInfo.pResourceMgr->GetBuffer(CacheUseInfo.VertexBuffer0Idx, pDevice, pCtx),
             CacheUseInfo.pResourceMgr->GetBuffer(CacheUseInfo.VertexBuffer1Idx, pDevice, pCtx) //
         };
-    pCtx->SetVertexBuffers(0, static_cast<Uint32>(pVBs.size()), pVBs.data(), nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+    pCtx->SetVertexBuffers(0, static_cast<Uint32>(pVBs.size()),
+        pVBs.data(), nullptr,
+        RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
 
     auto* pIndexBuffer = CacheUseInfo.pResourceMgr->GetBuffer(CacheUseInfo.IndexBufferIdx, pDevice, pCtx);
     pCtx->SetIndexBuffer(pIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);

@@ -15,12 +15,36 @@ static const ShaderIncInfo g_Shaders[] =
         #include "FullScreenTriangleVSOutput.fxh.h"
     },
     {
+        "QxFullScreenTriangleVS.hlsl",
+        #include "QxFullScreenTriangleVS.hlsl.h"
+    },
+    {
+        "QxFullScreenTriangleVSOutput.hlsl",
+        #include "QxFullScreenTriangleVSOutput.hlsl.h"
+    },
+    {
         "BasicStructures.fxh",
         #include "BasicStructures.fxh.h"
     },
     {
         "PBR_Common.fxh",
         #include "PBR_Common.fxh.h"
+    },
+    {
+        "QxBasicStructures.hlsl",
+        #include "QxBasicStructures.hlsl.h"
+    },
+    {
+        "QxPBR_Common.hlsl",
+        #include "QxPBR_Common.hlsl.h"
+    },
+    {
+        "QxShaderUtilities.hlsl",
+        #include "QxShaderUtilities.hlsl.h"
+    },
+    {
+        "QxShadows.hlsl",
+        #include "QxShadows.hlsl.h"
     },
     {
         "ShaderUtilities.fxh",
@@ -51,6 +75,34 @@ static const ShaderIncInfo g_Shaders[] =
         #include "PrefilterEnvMap.psh.h"
     },
     {
+        "QxComputeIrradianceMapPS.hlsl",
+        #include "QxComputeIrradianceMapPS.hlsl.h"
+    },
+    {
+        "QxCubemapFaceVS.hlsl",
+        #include "QxCubemapFaceVS.hlsl.h"
+    },
+    {
+        "QxGLTF_PBR_PrecomputeCommon.hlsl",
+        #include "QxGLTF_PBR_PrecomputeCommon.hlsl.h"
+    },
+    {
+        "QxPrecomputeGLTF_BRDF_PS.hlsl",
+        #include "QxPrecomputeGLTF_BRDF_PS.hlsl.h"
+    },
+    {
+        "QxPrefilterEnvMapPS.hlsl",
+        #include "QxPrefilterEnvMapPS.hlsl.h"
+    },
+    {
+        "QxRenderGLTF_PBR_PS.hlsl",
+        #include "QxRenderGLTF_PBR_PS.hlsl.h"
+    },
+    {
+        "QxRenderGLTF_PBR_VS.hlsl",
+        #include "QxRenderGLTF_PBR_VS.hlsl.h"
+    },
+    {
         "RenderGLTF_PBR.psh",
         #include "RenderGLTF_PBR.psh.h"
     },
@@ -69,6 +121,18 @@ static const ShaderIncInfo g_Shaders[] =
     {
         "GLTF_PBR_VertexProcessing.fxh",
         #include "GLTF_PBR_VertexProcessing.fxh.h"
+    },
+    {
+        "QxGLTF_PBR_Shading.hlsl",
+        #include "QxGLTF_PBR_Shading.hlsl.h"
+    },
+    {
+        "QxGLTF_PBR_Structures.hlsl",
+        #include "QxGLTF_PBR_Structures.hlsl.h"
+    },
+    {
+        "QxGLTF_PBR_VertexProcessing.hlsl",
+        #include "QxGLTF_PBR_VertexProcessing.hlsl.h"
     },
     {
         "AtmosphereShadersCommon.fxh",
@@ -193,6 +257,14 @@ static const ShaderIncInfo g_Shaders[] =
     {
         "EpipolarLightScatteringStructures.fxh",
         #include "EpipolarLightScatteringStructures.fxh.h"
+    },
+    {
+        "QxToneMapping.hlsl",
+        #include "QxToneMapping.hlsl.h"
+    },
+    {
+        "QxToneMappingStructures.hlsl",
+        #include "QxToneMappingStructures.hlsl.h"
     },
     {
         "ToneMapping.fxh",

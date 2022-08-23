@@ -40,7 +40,9 @@
 namespace Diligent
 {
 
-#include "Shaders/GLTF_PBR/public/GLTF_PBR_Structures.fxh"
+// #include "Shaders/GLTF_PBR/public/GLTF_PBR_Structures.fxh"
+#include "Shaders/GLTF_PBR/public/QxGLTF_PBR_Structures.hlsl"
+
 
 /// Implementation of a GLTF PBR renderer
 class GLTF_PBR_Renderer
@@ -313,7 +315,8 @@ private:
             return AlphaMode != rhs.AlphaMode || DoubleSided != rhs.DoubleSided;
         }
 
-        GLTF::Material::ALPHA_MODE AlphaMode   = GLTF::Material::ALPHA_MODE_OPAQUE;
+        GLTF::Material::ALPHA_MODE AlphaMode   =
+            GLTF::Material::ALPHA_MODE_OPAQUE;
         bool                       DoubleSided = false;
     };
 
@@ -355,7 +358,8 @@ private:
     RefCntAutoPtr<ITextureView> m_pDefaultPhysDescSRV;
 
 
-    static constexpr TEXTURE_FORMAT IrradianceCubeFmt    = TEX_FORMAT_RGBA32_FLOAT;
+    static constexpr TEXTURE_FORMAT IrradianceCubeFmt    =
+        TEX_FORMAT_RGBA32_FLOAT;
     static constexpr TEXTURE_FORMAT PrefilteredEnvMapFmt = TEX_FORMAT_RGBA16_FLOAT;
     static constexpr Uint32         IrradianceCubeDim    = 64;
     static constexpr Uint32         PrefilteredEnvMapDim = 256;
