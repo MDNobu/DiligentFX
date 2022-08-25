@@ -73,7 +73,8 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*    pDevice,
         TexDesc.Format = PrefilteredEnvMapFmt;
         RefCntAutoPtr<ITexture> PrefilteredEnvMapTex;
         pDevice->CreateTexture(TexDesc, nullptr, &PrefilteredEnvMapTex);
-        m_pPrefilteredEnvMapSRV = PrefilteredEnvMapTex->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
+        m_pPrefilteredEnvMapSRV = PrefilteredEnvMapTex->GetDefaultView(
+            TEXTURE_VIEW_SHADER_RESOURCE);
     }
 
     {
@@ -133,8 +134,12 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*    pDevice,
 
     if (CI.RTVFmt != TEX_FORMAT_UNKNOWN || CI.DSVFmt != TEX_FORMAT_UNKNOWN)
     {
-        CreateUniformBuffer(pDevice, sizeof(GLTFNodeShaderTransforms), "GLTF node transforms CB", &m_TransformsCB);
-        CreateUniformBuffer(pDevice, sizeof(GLTFMaterialShaderInfo) + sizeof(GLTFRendererShaderParameters), "GLTF attribs CB", &m_GLTFAttribsCB);
+        CreateUniformBuffer(pDevice, sizeof(GLTFNodeShaderTransforms),
+            "GLTF node transforms CB", &m_TransformsCB);
+        CreateUniformBuffer(pDevice,
+            sizeof(GLTFMaterialShaderInfo) + sizeof(GLTFRendererShaderParameters),
+            "GLTF attribs CB",
+            &m_GLTFAttribsCB);
         CreateUniformBuffer(pDevice, static_cast<Uint32>(sizeof(float4x4) * m_Settings.MaxJointCount), "GLTF joint transforms", &m_JointsBuffer);
 
         // clang-format off
@@ -859,7 +864,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                                ModelResourceBindings* pModelBindings,
                                ResourceCacheBindings* pCacheBindings)
 {
-    DEV_CHECK_ERR((pModelBindings != nullptr) ^ (pCacheBindings != nullptr), "Either model bindings or cache bindings must not be null");
+    DEV_CHECK_ERR((pModelBindings != nullptr) ^ (pCacheBindings != nullptr),
+        "Either model bindings or cache bindings must not be null");
     DEV_CHECK_ERR(pModelBindings == nullptr || pModelBindings->MaterialSRB.size() == GLTFModel.Materials.size(),
                   "The number of material shader resource bindings is not consistent with the number of materials");
 
@@ -872,11 +878,17 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                 GLTFModel.GetBuffer(GLTF::Model::BUFFER_ID_VERTEX_BASIC_ATTRIBS),
                 GLTFModel.GetBuffer(GLTF::Model::BUFFER_ID_VERTEX_SKIN_ATTRIBS) //
             };
-        pCtx->SetVertexBuffers(0, static_cast<Uint32>(pVBs.size()), pVBs.data(), nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+        pCtx->SetVertexBuffers(0,
+            static_cast<Uint32>(pVBs.size()),
+            pVBs.data(),
+            nullptr,
+            RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
+            SET_VERTEX_BUFFERS_FLAG_RESET);
 
         if (auto* pIndexBuffer = GLTFModel.GetBuffer(GLTF::Model::BUFFER_ID_INDEX))
         {
-            pCtx->SetIndexBuffer(pIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+            pCtx->SetIndexBuffer(pIndexBuffer, 0,
+                RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
         }
     }
 
@@ -911,6 +923,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                 if (material.Attribs.AlphaMode != AlphaMode)
                     continue;
 
+                // 根据需要更新和设置当前pso,以及SRB
+                {
                 const PSOKey Key{AlphaMode, material.DoubleSided};
                 if (Key != CurrPSOKey)
                 {
@@ -928,18 +942,21 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                 {
                     VERIFY_EXPR(pCurrPSO == GetPSO(PSOKey{AlphaMode, material.DoubleSided}));
                 }
+                }
 
                 if (pModelBindings != nullptr)
                 {
                     VERIFY(primitive.MaterialId < pModelBindings->MaterialSRB.size(),
                            "Material index is out of bounds. This mostl likely indicates that shader resources were initialized for a different model.");
 
-                    IShaderResourceBinding* const pSRB = pModelBindings->MaterialSRB[primitive.MaterialId].RawPtr<IShaderResourceBinding>();
+                    IShaderResourceBinding* const pSRB = pModelBindings->MaterialSRB[primitive.MaterialId].
+                        RawPtr<IShaderResourceBinding>();
                     DEV_CHECK_ERR(pSRB != nullptr, "Unable to find SRB for GLTF material.");
                     if (pCurrSRB != pSRB)
                     {
                         pCurrSRB = pSRB;
-                        pCtx->CommitShaderResources(pSRB, RESOURCE_STATE_TRANSITION_MODE_VERIFY);
+                        pCtx->CommitShaderResources(pSRB,
+                            RESOURCE_STATE_TRANSITION_MODE_VERIFY);
                     }
                 }
                 else
@@ -948,7 +965,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                     if (pCurrSRB != pCacheBindings->pSRB)
                     {
                         pCurrSRB = pCacheBindings->pSRB;
-                        pCtx->CommitShaderResources(pCurrSRB, RESOURCE_STATE_TRANSITION_MODE_VERIFY);
+                        pCtx->CommitShaderResources(pCurrSRB,
+                            RESOURCE_STATE_TRANSITION_MODE_VERIFY);
                     }
                 }
 
@@ -961,15 +979,20 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                 }
 
                 {
-                    MapHelper<GLTFNodeShaderTransforms> pTransforms{pCtx, m_TransformsCB, MAP_WRITE, MAP_FLAG_DISCARD};
+                    MapHelper<GLTFNodeShaderTransforms> pTransforms{pCtx,
+                        m_TransformsCB,
+                        MAP_WRITE,
+                        MAP_FLAG_DISCARD};
                     pTransforms->NodeMatrix = Mesh.Transforms.matrix * RenderParams.ModelTransform;
                     pTransforms->JointCount = static_cast<int>(JointCount);
                 }
 
                 if (JointCount != 0 && pLastAnimatedMesh != &Mesh)
                 {
-                    MapHelper<float4x4> pJoints{pCtx, m_JointsBuffer, MAP_WRITE, MAP_FLAG_DISCARD};
-                    memcpy(pJoints, Mesh.Transforms.jointMatrices.data(), JointCount * sizeof(float4x4));
+                    MapHelper<float4x4> pJoints{pCtx, m_JointsBuffer,
+                        MAP_WRITE, MAP_FLAG_DISCARD};
+                    memcpy(pJoints, Mesh.Transforms.jointMatrices.data(),
+                        JointCount * sizeof(float4x4));
                     pLastAnimatedMesh = &Mesh;
                 }
 
@@ -978,13 +1001,15 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
                     {
                         GLTFRendererShaderParameters  RenderParameters;
                         GLTF::Material::ShaderAttribs MaterialInfo;
-                        static_assert(sizeof(GLTFMaterialShaderInfo) == sizeof(GLTF::Material::ShaderAttribs),
+                        static_assert(sizeof(GLTFMaterialShaderInfo) ==
+                            sizeof(GLTF::Material::ShaderAttribs),
                                       "The sizeof(GLTFMaterialShaderInfo) is inconsistent with sizeof(GLTF::Material::ShaderAttribs)");
                     };
                     static_assert(sizeof(GLTFAttribs) <= 256, "Size of dynamic GLTFAttribs buffer exceeds 256 bytes. "
                                                               "It may be worth trying to reduce the size or just live with it.");
 
-                    MapHelper<GLTFAttribs> pGLTFAttribs{pCtx, m_GLTFAttribsCB, MAP_WRITE, MAP_FLAG_DISCARD};
+                    MapHelper<GLTFAttribs> pGLTFAttribs{pCtx, m_GLTFAttribsCB,
+                        MAP_WRITE, MAP_FLAG_DISCARD};
 
                     pGLTFAttribs->MaterialInfo = material.Attribs;
 
@@ -1002,14 +1027,18 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*        pCtx,
 
                 if (primitive.HasIndices())
                 {
-                    DrawIndexedAttribs drawAttrs{primitive.IndexCount, VT_UINT32, DRAW_FLAG_VERIFY_ALL};
+                    DrawIndexedAttribs drawAttrs{
+                        primitive.IndexCount,
+                        VT_UINT32,
+                        DRAW_FLAG_VERIFY_ALL};
                     drawAttrs.FirstIndexLocation = FirstIndexLocation + primitive.FirstIndex;
                     drawAttrs.BaseVertex         = BaseVertex;
                     pCtx->DrawIndexed(drawAttrs);
                 }
                 else
                 {
-                    DrawAttribs drawAttrs{primitive.VertexCount, DRAW_FLAG_VERIFY_ALL};
+                    DrawAttribs drawAttrs{primitive.VertexCount,
+                        DRAW_FLAG_VERIFY_ALL};
                     drawAttrs.StartVertexLocation = BaseVertex;
                     pCtx->Draw(drawAttrs);
                 }

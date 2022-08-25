@@ -82,6 +82,7 @@ public:
     // Rendering Information
     struct RenderInfo
     {
+        // model transform所有gltf以这个为根节点
         float4x4 ModelTransform = float4x4::Identity();
 
         // Alpha Mode flags
@@ -165,14 +166,87 @@ public:
     };
 
     
+    // Render a GLTF Model
+    void Render(IDeviceContext* pCtx,
+        GLTF::Model& GLTFModel,
+        const RenderInfo& RenderParams,
+        ModelResourceBindings* pModelBindings,
+        ResourceCacheBindings* pCacheBindings = nullptr);
+    
+    ModelResourceBindings CreateResourceBindings(
+        GLTF::Model& GLTFModel,
+        IBuffer* pCameraAttribs,
+        IBuffer* pLightAttribs
+        );
+    
+    
+    // 预计算IBL用的cubemap
+    void PreComputeCubemaps(IRenderDevice* pDevice,
+        IDeviceContext* pCtx,
+        ITextureView* pEnvironmentMap);
+
+#pragma region SRVGetters
+    ITextureView* GetIrradianceCubeSRV()
+    {
+        return m_pIrradianceCubeSRV;
+    }
+    ITextureView* GetPrefilteredEnvMapSRV()
+    {
+        return m_pPrefilteredEnvMapSRV;
+    }
+    
+    ITextureView* GetBRDFLUTSRV()
+    {
+        return m_pBRDF_LUT_SRV;
+    }
+    
+    ITextureView* GetWhiteTexSRV()
+    {
+        return m_pWhiteTexSRV;
+    }
+    ITextureView* GetBlackTexSRV()
+    {
+        return m_pBlackTexSRV;
+    }
+    ITextureView* GetDefaultNormalMapSRV()
+    {
+        return m_pDefaultNormalMapSRV;
+    }
+#pragma endregion
+    
+    // create a shader resource binding for given material
+    void CreateMaterialSRB(GLTF::Model& Model,
+        GLTF::Material& Material,
+        IBuffer* pCameraAttribs,
+        IBuffer* pLightAttribs,
+        IPipelineState* pPSO,
+        IShaderResourceBinding** ppMaterialSRB);
+    
+    // Create a shader resource binding for a GLTF resource cache
+    void CreateResourceCacheSRB(
+        IRenderDevice* pDevice,
+        IDeviceContext* pCtx,
+        GLTF::ResourceCacheUseInfo& CacheUseInfo,
+        IBuffer* pCameraAttribs,
+        IBuffer* pLightAttribs,
+        IPipelineState* pPSO,
+        IShaderResourceBinding** ppCacheSRB);
+    
+    /// Prepares the renderer for rendering objects.
+    /// This method must be called at least once per frame.
+    void Begin(IDeviceContext* pCtx);
+    
     /// Prepares the renderer for rendering objects from the resource cache.
     /// This method must be called at least once per frame before the first object
     /// from the cache is rendered.
     void Begin(
         IRenderDevice* pDevice,
         IDeviceContext* pCtx,
-        GLTF::ResourceCacheUseInfo& CacheUseInfo;
-        
+        GLTF::ResourceCacheUseInfo& CacheUseInfo,
+        ResourceCacheBindings& Bindings,
+        IBuffer* pCameraAttribs,
+        IBuffer* pLightAttribs,
+        IPipelineState* pPSO = nullptr
         );
 private:
 
