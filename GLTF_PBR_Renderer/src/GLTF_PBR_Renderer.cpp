@@ -140,7 +140,8 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*    pDevice,
             sizeof(GLTFMaterialShaderInfo) + sizeof(GLTFRendererShaderParameters),
             "GLTF attribs CB",
             &m_GLTFAttribsCB);
-        CreateUniformBuffer(pDevice, static_cast<Uint32>(sizeof(float4x4) * m_Settings.MaxJointCount), "GLTF joint transforms", &m_JointsBuffer);
+        CreateUniformBuffer(pDevice, static_cast<Uint32>(sizeof(float4x4) * m_Settings.MaxJointCount),
+            "GLTF joint transforms", &m_JointsBuffer);
 
         // clang-format off
         StateTransitionDesc Barriers[] = 
@@ -334,9 +335,12 @@ void GLTF_PBR_Renderer::CreatePSO(IRenderDevice* pDevice)
         Vars.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT", SHADER_RESOURCE_VARIABLE_TYPE_STATIC);
 
         // clang-format off
-        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT",          Sam_LinearClamp);
-        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_IrradianceMap",     Sam_LinearClamp);
-        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_PrefilteredEnvMap", Sam_LinearClamp);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT",
+            Sam_LinearClamp);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_IrradianceMap",
+            Sam_LinearClamp);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_PrefilteredEnvMap",
+            Sam_LinearClamp);
         // clang-format on
     }
 
@@ -366,7 +370,8 @@ void GLTF_PBR_Renderer::CreatePSO(IRenderDevice* pDevice)
 
     PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
 
-    auto& RT0          = PSOCreateInfo.GraphicsPipeline.BlendDesc.RenderTargets[0];
+    auto& RT0          =
+        PSOCreateInfo.GraphicsPipeline.BlendDesc.RenderTargets[0];
     RT0.BlendEnable    = true;
     RT0.SrcBlend       = BLEND_FACTOR_SRC_ALPHA;
     RT0.DestBlend      = BLEND_FACTOR_INV_SRC_ALPHA;
@@ -395,12 +400,18 @@ void GLTF_PBR_Renderer::CreatePSO(IRenderDevice* pDevice)
     {
         if (m_Settings.UseIBL)
         {
-            PSO->GetStaticVariableByName(SHADER_TYPE_PIXEL, "g_BRDF_LUT")->Set(m_pBRDF_LUT_SRV);
+            PSO->GetStaticVariableByName(
+                SHADER_TYPE_PIXEL,
+                "g_BRDF_LUT")->Set(m_pBRDF_LUT_SRV);
         }
         // clang-format off
-        PSO->GetStaticVariableByName(SHADER_TYPE_VERTEX, "cbTransforms")->Set(m_TransformsCB);
-        PSO->GetStaticVariableByName(SHADER_TYPE_PIXEL, "cbGLTFAttribs")->Set(m_GLTFAttribsCB);
-        PSO->GetStaticVariableByName(SHADER_TYPE_VERTEX, "cbJointTransforms")->Set(m_JointsBuffer);
+        PSO->GetStaticVariableByName(
+            SHADER_TYPE_VERTEX,
+            "cbTransforms")->Set(m_TransformsCB);
+        PSO->GetStaticVariableByName(SHADER_TYPE_PIXEL,
+            "cbGLTFAttribs")->Set(m_GLTFAttribsCB);
+        PSO->GetStaticVariableByName(SHADER_TYPE_VERTEX,
+            "cbJointTransforms")->Set(m_JointsBuffer);
         // clang-format on
     }
 }
@@ -413,25 +424,30 @@ void GLTF_PBR_Renderer::InitCommonSRBVars(IShaderResourceBinding* pSRB,
 
     if (pCameraAttribs != nullptr)
     {
-        if (auto* pCameraAttribsVSVar = pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "cbCameraAttribs"))
+        if (auto* pCameraAttribsVSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "cbCameraAttribs"))
             pCameraAttribsVSVar->Set(pCameraAttribs);
 
-        if (auto* pCameraAttribsPSVar = pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "cbCameraAttribs"))
+        if (auto* pCameraAttribsPSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "cbCameraAttribs"))
             pCameraAttribsPSVar->Set(pCameraAttribs);
     }
 
     if (pLightAttribs != nullptr)
     {
-        if (auto* pLightAttribsPSVar = pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "cbLightAttribs"))
+        if (auto* pLightAttribsPSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "cbLightAttribs"))
             pLightAttribsPSVar->Set(pLightAttribs);
     }
 
     if (m_Settings.UseIBL)
     {
-        if (auto* pIrradianceMapPSVar = pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_IrradianceMap"))
+        if (auto* pIrradianceMapPSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_IrradianceMap"))
             pIrradianceMapPSVar->Set(m_pIrradianceCubeSRV);
 
-        if (auto* pPrefilteredEnvMap = pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_PrefilteredEnvMap"))
+        if (auto* pPrefilteredEnvMap =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_PrefilteredEnvMap"))
             pPrefilteredEnvMap->Set(m_pPrefilteredEnvMapSRV);
     }
 }
@@ -457,7 +473,10 @@ void GLTF_PBR_Renderer::CreateMaterialSRB(GLTF::Model&             Model,
 
     InitCommonSRBVars(pSRB, pCameraAttribs, pLightAttribs);
 
-    auto SetTexture = [&](GLTF::Material::TEXTURE_ID TexId, ITextureView* pDefaultTexSRV, const char* VarName) //
+    auto SetTexture = [&](
+        GLTF::Material::TEXTURE_ID TexId,
+        ITextureView* pDefaultTexSRV,
+        const char* VarName) //
     {
         RefCntAutoPtr<ITextureView> pTexSRV;
 
@@ -481,20 +500,26 @@ void GLTF_PBR_Renderer::CreateMaterialSRB(GLTF::Model&             Model,
         if (pTexSRV == nullptr)
             pTexSRV = pDefaultTexSRV;
 
-        if (auto* pVar = pSRB->GetVariableByName(SHADER_TYPE_PIXEL, VarName))
+        if (auto* pVar = pSRB->GetVariableByName(
+            SHADER_TYPE_PIXEL, VarName))
             pVar->Set(pTexSRV);
     };
 
-    SetTexture(GLTF::Material::TEXTURE_ID_BASE_COLOR, m_pWhiteTexSRV, "g_ColorMap");
-    SetTexture(GLTF::Material::TEXTURE_ID_PHYSICAL_DESC, m_pDefaultPhysDescSRV, "g_PhysicalDescriptorMap");
-    SetTexture(GLTF::Material::TEXTURE_ID_NORMAL_MAP, m_pDefaultNormalMapSRV, "g_NormalMap");
+    SetTexture(GLTF::Material::TEXTURE_ID_BASE_COLOR,
+        m_pWhiteTexSRV, "g_ColorMap");
+    SetTexture(GLTF::Material::TEXTURE_ID_PHYSICAL_DESC,
+        m_pDefaultPhysDescSRV, "g_PhysicalDescriptorMap");
+    SetTexture(GLTF::Material::TEXTURE_ID_NORMAL_MAP,
+        m_pDefaultNormalMapSRV, "g_NormalMap");
     if (m_Settings.UseAO)
     {
-        SetTexture(GLTF::Material::TEXTURE_ID_OCCLUSION, m_pWhiteTexSRV, "g_AOMap");
+        SetTexture(GLTF::Material::TEXTURE_ID_OCCLUSION,
+            m_pWhiteTexSRV, "g_AOMap");
     }
     if (m_Settings.UseEmissive)
     {
-        SetTexture(GLTF::Material::TEXTURE_ID_EMISSIVE, m_pBlackTexSRV, "g_EmissiveMap");
+        SetTexture(GLTF::Material::TEXTURE_ID_EMISSIVE,
+            m_pBlackTexSRV, "g_EmissiveMap");
     }
 }
 

@@ -11,6 +11,12 @@
 #include "MapHelper.hpp"
 #include "GraphicsAccessories.hpp"
 
+namespace ShaderConstants
+{
+const char* CameraAttrib = "cbCameraAttribs";
+
+}
+
 namespace Diligent
 {
 QxGLTF_PBR_Render::QxGLTF_PBR_Render(IRenderDevice* pDevice, IDeviceContext* pCtx, const CreateInfo& CI)
@@ -125,6 +131,22 @@ QxGLTF_PBR_Render::QxGLTF_PBR_Render(IRenderDevice* pDevice, IDeviceContext* pCt
             sizeof(GLTFMaterialShaderInfo) + sizeof(GLTFRendererShaderParameters),
             "GLTF attribs CB",
             &m_GTLFAttribCB);
+        CreateUniformBuffer(
+            pDevice,
+            static_cast<Uint32>(sizeof(float4x4) * m_Settings.MaxJointCount),
+            "GLTF joint transforms",
+            &m_JointsBuffer
+            );
+
+        StateTransitionDesc Barriers[] =
+        {
+            {m_TransformCB, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
+{m_GTLFAttribCB, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
+{m_JointsBuffer, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE}
+        };
+
+        pCtx->TransitionResourceStates(_countof(Barriers), Barriers);
+        CreatePSO(pDevice);
     }
 }
 
@@ -351,6 +373,343 @@ void QxGLTF_PBR_Render::Render(IDeviceContext* pCtx,
                     pCtx->Draw(drawAttrs);
                 }
             }
+        }
+    }
+}
+
+void QxGLTF_PBR_Render::CreateMaterialSRB(
+    GLTF::Model& Model,
+    GLTF::Material& Material,
+    IBuffer* pCameraAttribs,
+    IBuffer* pLightAttribs,
+    IPipelineState* pPSO,
+    IShaderResourceBinding** ppMaterialSRB)
+{
+    if (pPSO == nullptr)
+    {
+        pPSO = GetPSO(PSOKey{});
+    }
+
+    pPSO->CreateShaderResourceBinding(ppMaterialSRB, true);
+    auto* const pSRB = *ppMaterialSRB;
+    if (pSRB == nullptr)
+    {
+        LOG_ERROR_MESSAGE("Failed to create material SRB");
+        return;
+    }
+
+    InitCommonSRBVars(pSRB, pCameraAttribs, pLightAttribs);
+
+    auto SetTexture = [&](GLTF::Material::TEXTURE_ID TexId,
+        ITextureView* pDefaultTexSRV,
+        const char* VarName)
+    {
+      RefCntAutoPtr<ITextureView> pTexSRV;
+
+        auto TexIdx = Material.TextureIds[TexId];
+      if (TexIdx >= 0)
+      {
+          if (auto* pTexture = Model.GetTexture(TexId))
+          {
+              if (pTexture->GetDesc().Type == RESOURCE_DIM_TEX_2D_ARRAY)
+              {
+                pTexSRV = pTexture->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);    
+              }
+              else
+              {
+                  TextureViewDesc SRVDesc;
+                  SRVDesc.ViewType = TEXTURE_VIEW_SHADER_RESOURCE;
+                  SRVDesc.TextureDim = RESOURCE_DIM_TEX_2D_ARRAY;
+                  pTexture->CreateView(SRVDesc, &pTexSRV);
+              }
+          }
+      }
+
+      if (pTexSRV == nullptr)
+      {
+          pTexSRV = pDefaultTexSRV;
+      }
+      if (auto* pVar =
+          pSRB->GetVariableByName(SHADER_TYPE_PIXEL, VarName))
+      {
+          pVar->Set(pTexSRV);
+      }
+    };
+
+    SetTexture(GLTF::Material::TEXTURE_ID_BASE_COLOR,
+        m_pWhiteTexSRV,
+        "g_ColorMap");
+    SetTexture(GLTF::Material::TEXTURE_ID_PHYSICAL_DESC,
+        m_pDefaultPhysDescSRV,
+        "g_PhysicalDescriptorMap");
+    SetTexture(GLTF::Material::TEXTURE_ID_NORMAL_MAP,
+        m_pDefaultNormalMapSRV,
+        "g_NormalMap");
+    if (m_Settings.UseAO)
+    {
+        SetTexture(GLTF::Material::TEXTURE_ID_OCCLUSION,
+            m_pWhiteTexSRV,
+            "g_AOMap");
+    }
+
+    if (m_Settings.UseEmissive)
+    {
+        SetTexture(GLTF::Material::TEXTURE_ID_EMISSIVE,
+            m_pBlackTexSRV,
+            "g_EmissiveMap");
+    }
+}
+
+void QxGLTF_PBR_Render::CreatePSO(IRenderDevice* pDevice)
+{
+    GraphicsPipelineStateCreateInfo PSOCreateInfo;
+    PipelineStateDesc& PSODesc =
+        PSOCreateInfo.PSODesc;
+    GraphicsPipelineDesc& GraphicPipeline =
+        PSOCreateInfo.GraphicsPipeline;
+
+    PSODesc.Name = "Render GLTF PBR PSO";
+    PSODesc.PipelineType = PIPELINE_TYPE_GRAPHICS;
+
+    GraphicPipeline.NumViewports = 1;
+    GraphicPipeline.RTVFormats[0] = m_Settings.RTVFmt;
+    GraphicPipeline.DSVFormat = m_Settings.DSVFmt;
+    GraphicPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    GraphicPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
+    GraphicPipeline.RasterizerDesc.FrontCounterClockwise = m_Settings.FrontCCW;
+
+    ShaderCreateInfo ShaderCI;
+    ShaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
+    ShaderCI.UseCombinedTextureSamplers = true;
+    ShaderCI.pShaderSourceStreamFactory = &DiligentFXShaderSourceStreamFactory::GetInstance();
+
+    ShaderMacroHelper Macros;
+    Macros.AddShaderMacro("MAX_JOINT_COUNT", m_Settings.MaxJointCount);
+    Macros.AddShaderMacro("ALLOW_DEBUG_VIEW", m_Settings.AllowDebugView);
+    Macros.AddShaderMacro("TONE_MAPPING_MODE", "TONE_MAPPING_MODE_UNCHARTED2");
+    Macros.AddShaderMacro("GLTF_PBR_IBL", m_Settings.UseIBL);
+    Macros.AddShaderMacro("GLTF_PBR_USE_AO", m_Settings.UseAO);
+    Macros.AddShaderMacro("GLTF_PBR_USE_EMISSIVE", m_Settings.UseEmissive);
+    Macros.AddShaderMacro("USE_TEXTURE_ALTAS", m_Settings.UseTextureAtlas);
+    Macros.AddShaderMacro("PBR_WORKFLOW_METALLIC_ROUGHNESS", GLTF::Material::PBR_WORKFLOW_METALL_ROUGH);
+    Macros.AddShaderMacro("PBR_WORKFLOW_SPECULAR_GLOSINESS", GLTF::Material::PBR_WORKFLOW_SPEC_GLOSS);
+    Macros.AddShaderMacro("GLTF_ALPHA_MODE_OPAQUE", GLTF::Material::ALPHA_MODE_OPAQUE);
+    Macros.AddShaderMacro("GLTF_ALPHA_MODE_MASK", GLTF::Material::ALPHA_MODE_MASK);
+    Macros.AddShaderMacro("GLTF_ALPHA_MODE_BLEND", GLTF::Material::ALPHA_MODE_BLEND);
+
+    ShaderCI.Macros = Macros;
+    // create vertex shader
+    RefCntAutoPtr<IShader> pVS;
+    {
+        ShaderCI.Desc.ShaderType = SHADER_TYPE_VERTEX;
+        ShaderCI.EntryPoint = "main";
+        ShaderCI.Desc.Name = "GLTF PBR VS";
+        ShaderCI.FilePath = "RenderGLTF_PBR.vsh";
+        pDevice->CreateShader(ShaderCI, &pVS);
+    }
+
+    //Create pixel shader
+    RefCntAutoPtr<IShader> pPS;
+    {
+        ShaderCI.Desc.ShaderType = SHADER_TYPE_PIXEL;
+        ShaderCI.Desc.Name = "GLTF PBR PS";
+        ShaderCI.FilePath = "RenderGLTF_PBR.psh";
+        pDevice->CreateShader(ShaderCI, &pPS);
+    }
+
+    LayoutElement Inputs[] =
+    {
+        //float3 Pos     : ATTRIB0;
+        {0, 0, 3, VT_FLOAT32},
+        //float3 Normal  : ATTRIB1;
+        {1, 0, 3, VT_FLOAT32},
+        //float2 UV0     : ATTRIB2;
+        {2, 0, 2, VT_FLOAT32},
+        //float2 UV1     : ATTRIB3;
+        {3, 0, 2, VT_FLOAT32},
+        //float4 Joint0  : ATTRIB4;
+        {4, 1, 4, VT_FLOAT32},
+        //float4 Weight0 : ATTRIB5;
+        {5, 1, 4, VT_FLOAT32}
+    };
+
+    //
+    PSOCreateInfo.GraphicsPipeline.InputLayout.LayoutElements = Inputs;
+    PSOCreateInfo.GraphicsPipeline.InputLayout.NumElements = _countof(Inputs);
+
+    PSODesc.ResourceLayout.DefaultVariableType =
+        SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE;
+
+    std::vector<ShaderResourceVariableDesc> Vars =
+    {
+        {SHADER_TYPE_VERTEX, "cbTransforms", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
+        {SHADER_TYPE_PIXEL, "cbGLTFAttribs", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
+        {SHADER_TYPE_VERTEX, "cbJointTransforms", SHADER_RESOURCE_VARIABLE_TYPE_STATIC}
+    };
+
+    std::vector<ImmutableSamplerDesc> ImtblSamplers;
+    if (m_Settings.UseImmutableSamplers)
+    {
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_ColorMap", m_Settings.ColorMapImmutableSampler);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_PhysicalDescriptorMap",
+            m_Settings.PhysicalMapImmutableSampler);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_NormalMap",
+            m_Settings.NormalMapImmutableSampler);
+    }
+
+    if (m_Settings.UseAO)
+    {
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_AOMap",
+            m_Settings.AOMapImmutableSampler);
+    }
+
+    if (m_Settings.UseEmissive)
+    {
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_EmissiveMap",
+            m_Settings.EmissiveMapImmutableSampler);
+    }
+
+    if (m_Settings.UseIBL)
+    {
+         Vars.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT",
+             SHADER_RESOURCE_VARIABLE_TYPE_STATIC);
+
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT",
+            Sam_LinearClamp);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_IrradianceMap",
+            Sam_LinearClamp);
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_PrefilteredEnvMap",
+            Sam_LinearClamp);
+    }
+
+    PSODesc.ResourceLayout.NumVariables =
+        static_cast<Uint32>(Vars.size());
+    PSODesc.ResourceLayout.Variables = Vars.data();
+    PSODesc.ResourceLayout.NumImmutableSamplers =
+        static_cast<Uint32>(ImtblSamplers.size());
+    PSODesc.ResourceLayout.ImmutableSamplers =
+        ImtblSamplers.empty() ? nullptr : ImtblSamplers.data();
+
+    PSOCreateInfo.pVS = pVS;
+    PSOCreateInfo.pPS = pPS;
+
+    // 创建opaque psos
+    {
+        PSOKey Key{GLTF::Material::ALPHA_MODE_OPAQUE, false};
+
+        RefCntAutoPtr<IPipelineState> pSingleSidedOpaquePSO;
+        pDevice->CreateGraphicsPipelineState(PSOCreateInfo,
+            &pSingleSidedOpaquePSO);
+        AddPSO(Key, std::move(pSingleSidedOpaquePSO));
+
+        PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_NONE;
+
+        Key.DoubleSided = true;
+
+        RefCntAutoPtr<IPipelineState> pDoubleSidedOpquePSO;
+        pDevice->CreateGraphicsPipelineState(
+            PSOCreateInfo,
+            &pDoubleSidedOpquePSO
+            );
+
+        AddPSO(Key, std::move(pDoubleSidedOpquePSO));
+    }
+
+    PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
+
+    RenderTargetBlendDesc& RT0 = PSOCreateInfo.GraphicsPipeline.BlendDesc.RenderTargets[0];
+    RT0.BlendEnable = true;
+    RT0.SrcBlend = BLEND_FACTOR_SRC_ALPHA;
+    RT0.DestBlend = BLEND_FACTOR_INV_SRC_ALPHA;
+    RT0.BlendOp = BLEND_OPERATION_ADD;
+    RT0.SrcBlendAlpha = BLEND_FACTOR_INV_SRC_ALPHA;
+    RT0.DestBlendAlpha = BLEND_FACTOR_ZERO;
+    RT0.BlendOpAlpha = BLEND_OPERATION_ADD;
+
+    {
+        PSOKey Key{GLTF::Material::ALPHA_MODE_BLEND, false};
+
+        RefCntAutoPtr<IPipelineState> pSingleSidedBlendPSO;
+        pDevice->CreateGraphicsPipelineState(PSOCreateInfo,
+            &pSingleSidedBlendPSO);
+        AddPSO(Key, std::move(pSingleSidedBlendPSO));
+
+        PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_NONE;
+
+        Key.DoubleSided = true;
+        RefCntAutoPtr<IPipelineState> pDoubleSidedBlendPSO;
+        pDevice->CreateGraphicsPipelineState(PSOCreateInfo,
+            &pDoubleSidedBlendPSO);
+        AddPSO(Key, std::move(pDoubleSidedBlendPSO));
+    }
+
+    // 每个pso cache中的pso 更新shader 参数
+    for (RefCntAutoPtr<IPipelineState>& PSO : m_PSOCaches)
+    {
+        if (m_Settings.UseIBL)
+        {
+            PSO->GetStaticVariableByName(
+                SHADER_TYPE_PIXEL,
+                "g_BRDF_LUT")->Set(
+                    m_pBRDF_LUT_SRV);
+        }
+
+        PSO->GetStaticVariableByName(
+            SHADER_TYPE_VERTEX,
+            "cbTransforms")->Set(
+                m_TransformCB);
+        PSO->GetStaticVariableByName(
+            SHADER_TYPE_PIXEL,
+            "cbGLTFAttribs")->Set(
+                m_GTLFAttribCB);
+        PSO->GetStaticVariableByName(
+            SHADER_TYPE_VERTEX,
+            "cbJointTransforms")->Set(
+                m_JointsBuffer);
+    }
+}
+
+void QxGLTF_PBR_Render::InitCommonSRBVars(IShaderResourceBinding* pSRB, IBuffer* pCameraAttribs, IBuffer* pLightAttribs)
+{
+    VERIFY_EXPR(pSRB != nullptr);
+
+    if (pCameraAttribs != nullptr)
+    {
+        if (auto* pCameraAttrbsVSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "cbCameraAttribs"))
+        {
+            pCameraAttrbsVSVar->Set(pCameraAttribs);
+        }
+
+        if (auto* pCameraAttribsPSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "cbCameraAttribs"))
+        {
+            pCameraAttribsPSVar->Set(pCameraAttribs);
+        }
+    }
+
+    if (pLightAttribs)
+    {
+        if (auto* pLightAttribsPSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "cbLightAttribs"))
+        {
+            pLightAttribsPSVar->Set(pLightAttribs);
+        }
+    }
+
+    if (m_Settings.UseIBL)
+    {
+        if (auto* pIrradianceMapPSVar =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_IrradianceMap"))
+        {
+            pIrradianceMapPSVar->Set(m_pIrradianceCubeSRV);
+        }
+
+        if (auto* pPrefilteredEnvMap =
+            pSRB->GetVariableByName(SHADER_TYPE_PIXEL,
+                "g_PrefilteredEnvMap"))
+        {
+            pPrefilteredEnvMap->Set(m_pPrefilteredEnvMapSRV);
         }
     }
 }
