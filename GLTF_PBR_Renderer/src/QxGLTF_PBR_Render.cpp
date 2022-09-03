@@ -377,6 +377,23 @@ void QxGLTF_PBR_Render::Render(IDeviceContext* pCtx,
     }
 }
 
+QxGLTF_PBR_Render::ModelResourceBindings QxGLTF_PBR_Render::CreateResourceBindings(
+    GLTF::Model& GLTFModel, IBuffer* pCameraAttribs, IBuffer* pLightAttribs)
+{
+    ModelResourceBindings ResourceBindings;
+    ResourceBindings.MaterialSRB.resize(GLTFModel.Materials.size());
+    for (size_t matIndex = 0; matIndex < GLTFModel.Materials.size(); ++matIndex)
+    {
+        CreateMaterialSRB(GLTFModel,
+            GLTFModel.Materials[matIndex],
+            pCameraAttribs,
+            pLightAttribs,
+            nullptr,
+            &ResourceBindings.MaterialSRB[matIndex]);
+    }
+    return ResourceBindings;
+}
+
 void QxGLTF_PBR_Render::CreateMaterialSRB(
     GLTF::Model& Model,
     GLTF::Material& Material,
@@ -458,6 +475,28 @@ void QxGLTF_PBR_Render::CreateMaterialSRB(
             m_pBlackTexSRV,
             "g_EmissiveMap");
     }
+}
+
+void QxGLTF_PBR_Render::Begin(IDeviceContext* pCtx)
+{
+    if (m_JointsBuffer)
+    {
+        MapHelper<float4x4> pJoints{
+            pCtx, m_JointsBuffer,
+            MAP_WRITE, MAP_FLAG_DISCARD
+            };
+    }
+}
+
+void QxGLTF_PBR_Render::Begin(IRenderDevice* pDevice,
+    IDeviceContext* pCtx,
+    GLTF::ResourceCacheUseInfo& CacheUseInfo,
+    ResourceCacheBindings& Bindings,
+    IBuffer* pCameraAttribs,
+    IBuffer* pLightAttribs,
+    IPipelineState* pPSO)
+{
+    
 }
 
 void QxGLTF_PBR_Render::CreatePSO(IRenderDevice* pDevice)

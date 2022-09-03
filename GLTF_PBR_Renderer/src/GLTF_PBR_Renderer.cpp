@@ -826,7 +826,12 @@ GLTF_PBR_Renderer::ModelResourceBindings GLTF_PBR_Renderer::CreateResourceBindin
     ResourceBindings.MaterialSRB.resize(GLTFModel.Materials.size());
     for (size_t mat = 0; mat < GLTFModel.Materials.size(); ++mat)
     {
-        CreateMaterialSRB(GLTFModel, GLTFModel.Materials[mat], pCameraAttribs, pLightAttribs, nullptr, &ResourceBindings.MaterialSRB[mat]);
+        CreateMaterialSRB(GLTFModel,
+            GLTFModel.Materials[mat],
+            pCameraAttribs,
+            pLightAttribs,
+            nullptr,
+            &ResourceBindings.MaterialSRB[mat]);
     }
     return ResourceBindings;
 }
@@ -836,7 +841,9 @@ void GLTF_PBR_Renderer::Begin(IDeviceContext* pCtx)
     if (m_JointsBuffer)
     {
         // In next-gen backends, dynamic buffers must be mapped before the first use in every frame
-        MapHelper<float4x4> pJoints{pCtx, m_JointsBuffer, MAP_WRITE, MAP_FLAG_DISCARD};
+        MapHelper<float4x4> pJoints{pCtx,
+            m_JointsBuffer,
+            MAP_WRITE, MAP_FLAG_DISCARD};
     }
 }
 
