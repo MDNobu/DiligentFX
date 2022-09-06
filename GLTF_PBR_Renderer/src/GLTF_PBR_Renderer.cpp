@@ -41,7 +41,8 @@
 namespace Diligent
 {
 
-const SamplerDesc GLTF_PBR_Renderer::CreateInfo::DefaultSampler = Sam_LinearWrap;
+const SamplerDesc GLTF_PBR_Renderer::CreateInfo::DefaultSampler =
+    Sam_LinearWrap;
 
 GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*    pDevice,
                                      IDeviceContext*   pCtx,
@@ -257,7 +258,8 @@ void GLTF_PBR_Renderer::CreatePSO(IRenderDevice* pDevice)
     ShaderCreateInfo ShaderCI;
     ShaderCI.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
     ShaderCI.UseCombinedTextureSamplers = true;
-    ShaderCI.pShaderSourceStreamFactory = &DiligentFXShaderSourceStreamFactory::GetInstance();
+    ShaderCI.pShaderSourceStreamFactory =
+        &DiligentFXShaderSourceStreamFactory::GetInstance();
 
     ShaderMacroHelper Macros;
     Macros.AddShaderMacro("MAX_JOINT_COUNT", m_Settings.MaxJointCount);

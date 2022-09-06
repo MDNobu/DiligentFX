@@ -309,8 +309,13 @@ private:
     {
         size_t Idx = GetPSOIdx(Key);
         VERIFY_EXPR(Idx < m_PSOCaches.size());
-        return Idx < m_PSOCaches.size() ?
-            m_PSOCaches[Idx] :nullptr;
+        IPipelineState* res = nullptr;
+        if (Idx < m_PSOCaches.size())
+        {
+            res = m_PSOCaches[Idx].RawPtr();
+        }
+        // return Idx < m_PSOCaches.size() ?  m_PSOCaches[Idx] : nullptr;
+        return res;
     }
 
     const CreateInfo m_Settings;

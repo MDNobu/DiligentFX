@@ -13,12 +13,18 @@
 
 namespace ShaderConstants
 {
-const char* CameraAttrib = "cbCameraAttribs";
-
+const char* CAMERA_ATTRIB = "cbCameraAttribs";
+const char* BRDF_LUT = "g_BRDF_LUT";
+const char* IRRADIANCE_MAP = "g_IrradianceMp";
+const char* PREFILTER_ENVMAP = "g_PrefilteredEnvMap"; 
 }
 
 namespace Diligent
 {
+// const SampleDesc QxGLTF_PBR_Render::CreateInfo::DefaultSampler = Sam_LinearClamp;
+
+const SamplerDesc QxGLTF_PBR_Render::CreateInfo::DefaultSampler = Sam_LinearClamp;
+
 QxGLTF_PBR_Render::QxGLTF_PBR_Render(IRenderDevice* pDevice, IDeviceContext* pCtx, const CreateInfo& CI)
     : m_Settings(CI)
 {
@@ -979,12 +985,14 @@ void QxGLTF_PBR_Render::CreatePSO(IRenderDevice* pDevice)
     GraphicPipeline.DSVFormat = m_Settings.DSVFmt;
     GraphicPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     GraphicPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
-    GraphicPipeline.RasterizerDesc.FrontCounterClockwise = m_Settings.FrontCCW;
+    GraphicPipeline.RasterizerDesc.FrontCounterClockwise =
+        m_Settings.FrontCCW;
 
     ShaderCreateInfo ShaderCI;
     ShaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
     ShaderCI.UseCombinedTextureSamplers = true;
-    ShaderCI.pShaderSourceStreamFactory = &DiligentFXShaderSourceStreamFactory::GetInstance();
+    ShaderCI.pShaderSourceStreamFactory =
+        &DiligentFXShaderSourceStreamFactory::GetInstance();
 
     ShaderMacroHelper Macros;
     Macros.AddShaderMacro("MAX_JOINT_COUNT", m_Settings.MaxJointCount);
@@ -1074,14 +1082,14 @@ void QxGLTF_PBR_Render::CreatePSO(IRenderDevice* pDevice)
 
     if (m_Settings.UseIBL)
     {
-         Vars.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT",
+         Vars.emplace_back(SHADER_TYPE_PIXEL, ShaderConstants::BRDF_LUT,
              SHADER_RESOURCE_VARIABLE_TYPE_STATIC);
 
-        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_BRDF_LUT",
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, ShaderConstants::BRDF_LUT,
             Sam_LinearClamp);
-        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_IrradianceMap",
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, ShaderConstants::IRRADIANCE_MAP,
             Sam_LinearClamp);
-        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, "g_PrefilteredEnvMap",
+        ImtblSamplers.emplace_back(SHADER_TYPE_PIXEL, ShaderConstants::PREFILTER_ENVMAP,
             Sam_LinearClamp);
     }
 
@@ -1151,9 +1159,10 @@ void QxGLTF_PBR_Render::CreatePSO(IRenderDevice* pDevice)
     {
         if (m_Settings.UseIBL)
         {
-            PSO->GetStaticVariableByName(
+            auto tmp = PSO->GetStaticVariableByName(
                 SHADER_TYPE_PIXEL,
-                "g_BRDF_LUT")->Set(
+                ShaderConstants::BRDF_LUT);
+            tmp->Set(
                     m_pBRDF_LUT_SRV);
         }
 
